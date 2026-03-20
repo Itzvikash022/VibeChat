@@ -1,7 +1,20 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.0.208:5000'; 
+import { Platform } from 'react-native';
+
+const getBaseUrl = () => {
+  if (process.env.EXPO_PUBLIC_API_URL) return process.env.EXPO_PUBLIC_API_URL;
+  
+  if (Platform.OS === 'web' && typeof window !== 'undefined') {
+    // Dynamically use the hostname the browser is using
+    return `http://${window.location.hostname}:5000`;
+  }
+  
+  return 'http://192.168.0.208:5000'; // Default fallback for native
+};
+
+const BASE_URL = getBaseUrl();
 
 const api = axios.create({
   baseURL: BASE_URL,

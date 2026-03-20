@@ -30,9 +30,8 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: true, // bcrypt hash — never stored in plain text
     },
-    refreshToken: {
-      type: String,
-    },
+    refreshToken: { type: String, default: null },
+    pushToken: { type: String, default: null },
   },
   { timestamps: true }
 );
