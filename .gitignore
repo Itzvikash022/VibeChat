@@ -1,0 +1,40 @@
+# Dependency directories
+node_modules/
+backend/node_modules/
+frontend/node_modules/
+
+# Environment files
+.env
+.env.local
+
+backend/.env
+frontend/.env
+
+# Expo/Mobile build artifacts
+frontend/.expo/
+frontend/dist/
+frontend/web-build/
+*.apk
+*.ipa
+
+# Logs
+logs/
+*.log
+backend/logs/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Agent & Context files
+.agents/
+.agent/
+_agents/
+_agent/
+.context/
+AI_CONTEXT.md
+brain/
+*.md.bak
+
+Project_Progress.md
+UI design 
