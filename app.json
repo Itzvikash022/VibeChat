@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "3a1ba417-d9ac-4d74-b3ea-5170559054e1"
+      }
+    },
+    "android": {
+      "package": "com.itzvikash.vibechat"
+    }
+  }
+}
