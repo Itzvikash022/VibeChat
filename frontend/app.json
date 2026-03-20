@@ -16,9 +16,15 @@
       "supportsTablet": false
     },
     "android": {
+      "package": "com.itzvikash.vibechat",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#1a1a2e"
+      }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "3a1ba417-d9ac-4d74-b3ea-5170559054e1"
       }
     },
     "web": {
