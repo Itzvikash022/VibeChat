@@ -13,5 +13,8 @@
   "type": "commonjs",
   "devDependencies": {
     "concurrently": "^9.2.1"
+  },
+  "dependencies": {
+    "eas": "^0.1.0"
   }
 }
