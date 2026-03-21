@@ -282,13 +282,14 @@ export default function MainScreen({ navigation }) {
     if (!validPattern.test(val)) { setVibeIdError('Only letters, numbers, and @!_-&<>()[] allowed'); return; }
     if (/\s/.test(val)) { setVibeIdError('Spaces not allowed'); return; }
     try {
-      await api.put('/api/user/vibeId', { userId, vibeId: val });
-      setVibeId(val);
-      await AsyncStorage.setItem('vibeId', val);
+      const res = await api.patch('/users/vibe-id', { userId, newVibeId: val });
+      const nextVibeId = res.data?.data?.vibeId || val;
+      setVibeId(nextVibeId);
+      await AsyncStorage.setItem('vibeId', nextVibeId);
       setEditingVibeId(false);
       setVibeIdError('');
     } catch (err) {
-      const msg = err?.response?.data?.error || 'Failed to update';
+      const msg = err?.response?.data?.message || err?.response?.data?.error || 'Failed to update';
       setVibeIdError(msg);
     }
   };
@@ -328,7 +329,7 @@ export default function MainScreen({ navigation }) {
   };
 
   const handleLogout = async () => {
-    await AsyncStorage.multiRemove(['userId', 'username', 'vibeId']);
+    await AsyncStorage.multiRemove(['userId', 'username', 'vibeId', 'accessToken', 'refreshToken']);
     disconnectSocket();
     navigation.replace('Login');
   };
@@ -402,12 +403,12 @@ export default function MainScreen({ navigation }) {
     if (!text && !img && !aud) return;
     setInputText(''); setPendingImage(null); setPendingAudio(null);
     let messageType = 'text'; let message = text; let mediaUrl = null; let audioUrl = null;
+    const optimisticId = Date.now().toString();
     try {
       if (img) { setUploading(true); mediaUrl = await uploadToCloudinary(img, 'image'); messageType = 'image'; setUploading(false); }
       else if (aud) { setUploading(true); audioUrl = await uploadToCloudinary(aud, 'raw'); messageType = 'audio'; setUploading(false); }
       // Payload must match backend schema: senderId, receiverId, messageType, message, mediaUrl, audioUrl
       // Optimistic render with 'sending' status
-      const optimisticId = Date.now().toString();
       const socketPayload = { senderId: userId, receiverId: activeChat.userId, messageType, message, mediaUrl, audioUrl };
       const optimistic = { 
         ...socketPayload, 
@@ -435,6 +436,7 @@ export default function MainScreen({ navigation }) {
       });
     } catch (e) { 
       setUploading(false); 
+      setMessages((prev) => prev.map((m) => m._id === optimisticId ? { ...m, status: 'failed' } : m));
       Alert.alert('Error', 'Failed to send message.'); 
     }
   }, [activeChat, inputText, pendingImage, pendingAudio, userId, socketConnected]);
