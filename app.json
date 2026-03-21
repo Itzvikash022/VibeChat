@@ -1,5 +1,8 @@
 {
   "expo": {
+    "name": "VibeChat",
+    "slug": "vibechat",
+    "version": "1.0.0",
     "extra": {
       "eas": {
         "projectId": "3a1ba417-d9ac-4d74-b3ea-5170559054e1"
