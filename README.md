@@ -75,10 +75,20 @@ npx expo start --web
 - `frontend/`: Multi-platform React Native components, services, and screens.
 - `docs/`: (Optional) Additional architectural and walkthrough documents.
 
----
+## 🕒 Changelog (Beta v1.1)
 
-## 📋 Deployment
-For detailed instructions on deploying to **Render** (Backend), **Vercel** (Frontend Web), and **EAS** (Android APK), please refer to the [Deployment Guide](./C:/Users/dev/.gemini/antigravity/brain/12b4c233-838b-4e12-8324-eb200b6365b0/deployment_guide.md).
+### 🎨 UI & UX Improvements
+- **Message Bubble Fix**: Resolved "squished text" issue where bubbles would wrap words prematurely into squares.
+- **Auto-Scroll**: Implemented intelligent auto-scrolling for `FlatList` when the keyboard opens or new messages arrive.
+- **Sticker Success UI**: Replaced blocking alerts with a beautiful, non-blocking "Successfully Added!" checkmark overlay and auto-modal-close.
+
+### 🚀 Performance & Caching
+- **Sticker Caching**: Integrated `AsyncStorage` to cache sticker libraries locally for instant, network-less loading.
+- **Optimized Autoplay**: Audio stickers now strictly autoplay **only** if they are the latest message in the chat and have not been played before on the current device.
+
+### 🛠️ Bug Fixes & Backend Alignment
+- **Cloudinary API Fix**: Re-routed media uploads through the secured backend `/media/upload` endpoint, resolving "Unknown API Key" errors and fixing unplayable audio recordings.
+- **Sticker Creation Fix**: Corrected property mapping for Cloudinary response URLs, resolving "userId and mediaUrl are required" API errors.
 
 ---
 

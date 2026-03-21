@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Audio } from 'expo-av';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import ImageMessage from './ImageMessage';
 import AudioPlayer from './AudioPlayer';
@@ -9,7 +10,7 @@ import api from '../services/api';
 /**
  * StickerContent - Autoplay and minimal UI for stickers
  */
-const StickerContent = ({ url, audioUrl, isMe, theme, currentPlayingUrl, setCurrentPlayingUrl }) => {
+const StickerContent = ({ id, url, audioUrl, isMe, theme, currentPlayingUrl, setCurrentPlayingUrl, isLastMessage }) => {
   const [status, setStatus] = useState('idle');
   const soundRef = useRef(null);
   const isAutoplayed = useRef(false);
@@ -34,9 +35,33 @@ const StickerContent = ({ url, audioUrl, isMe, theme, currentPlayingUrl, setCurr
   };
 
   useEffect(() => {
-    if (audioUrl && !isMe && !isAutoplayed.current) { isAutoplayed.current = true; setTimeout(play, 500); }
-    return () => { if (soundRef.current) soundRef.current.unloadAsync(); };
-  }, [audioUrl, isMe]);
+    let isCancelled = false;
+    const checkAndPlay = async () => {
+      if (!audioUrl || isMe || isAutoplayed.current || !isLastMessage) return;
+      try {
+        const playedStr = await AsyncStorage.getItem('played_stickers');
+        let playedList = playedStr ? JSON.parse(playedStr) : [];
+        if (!Array.isArray(playedList)) playedList = [];
+
+        if (!playedList.includes(id)) {
+          isAutoplayed.current = true;
+          if (!isCancelled) setTimeout(play, 500);
+          playedList.push(id);
+          if (playedList.length > 500) playedList = playedList.slice(-500);
+          await AsyncStorage.setItem('played_stickers', JSON.stringify(playedList));
+        }
+      } catch (err) {
+        console.error('AsyncStorage sticker autoplay error:', err);
+      }
+    };
+
+    checkAndPlay();
+
+    return () => {
+      isCancelled = true;
+      if (soundRef.current) soundRef.current.unloadAsync();
+    };
+  }, [audioUrl, isMe, id, isLastMessage]);
 
   useEffect(() => {
     if (currentPlayingUrl && currentPlayingUrl !== audioUrl && status === 'playing') stop();
@@ -54,7 +79,7 @@ const StickerContent = ({ url, audioUrl, isMe, theme, currentPlayingUrl, setCurr
   );
 };
 
-const MessageBubble = ({ item, userId, theme, currentPlayingUrl, setCurrentPlayingUrl }) => {
+const MessageBubble = ({ item, userId, theme, currentPlayingUrl, setCurrentPlayingUrl, isLastMessage }) => {
   const isMe = item.senderId?.toString() === userId?.toString();
   const { messageType, message, mediaUrl, audioUrl, createdAt } = item;
 
@@ -74,8 +99,10 @@ const MessageBubble = ({ item, userId, theme, currentPlayingUrl, setCurrentPlayi
       case 'sticker':
         return (
           <StickerContent 
+            id={item._id}
             url={media || content} audioUrl={audio} isMe={isMe} theme={theme}
             currentPlayingUrl={currentPlayingUrl} setCurrentPlayingUrl={setCurrentPlayingUrl}
+            isLastMessage={isLastMessage}
           />
         );
       case 'image':
@@ -103,33 +130,27 @@ const MessageBubble = ({ item, userId, theme, currentPlayingUrl, setCurrentPlayi
   const isMedia = ['image', 'audio', 'sticker', 'media'].includes(type);
 
   return (
-    <View style={[styles.row, isMe ? styles.rowMe : styles.rowThem]}>
-      <View style={[
-        styles.bubble,
-        isMedia 
-          ? styles.mediaBubble
-          : isMe
-            ? [styles.bubbleMe, { backgroundColor: theme['primary-container'] || theme.myBubble || '#5d60eb' }]
-            : [styles.bubbleThem, { backgroundColor: theme['surface-container-high'] || theme.theirBubble || '#222a3d', borderColor: (theme['outline-variant'] || '#464555') + '40' }]
+    <View style={[
+      styles.bubble,
+      isMedia 
+        ? styles.mediaBubble
+        : isMe
+          ? [styles.bubbleMe, { backgroundColor: theme['primary-container'] || theme.myBubble || '#5d60eb' }]
+          : [styles.bubbleThem, { backgroundColor: theme['surface-container-high'] || theme.theirBubble || '#222a3d', borderColor: (theme['outline-variant'] || '#464555') + '40' }]
+    ]}>
+      {renderContent()}
+      <Text style={[
+        styles.time, 
+        { color: isMe ? 'rgba(255,255,255,0.55)' : (theme['on-surface-variant'] || theme.textSecondary || '#8b949e') + '99' },
+        isMedia && styles.timeMedia
       ]}>
-        {renderContent()}
-        <Text style={[
-          styles.time, 
-          { color: isMe ? 'rgba(255,255,255,0.55)' : (theme['on-surface-variant'] || theme.textSecondary || '#8b949e') + '99' },
-          isMedia && styles.timeMedia
-        ]}>
-          {formatTime(createdAt || item.createdAt)}
-        </Text>
-      </View>
+        {formatTime(createdAt || item.createdAt)}
+      </Text>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', marginBottom: 8, paddingHorizontal: 4 },
-  rowMe: { justifyContent: 'flex-end' },
-  rowThem: { justifyContent: 'flex-start' },
-  
   bubble: { maxWidth: '75%' },
   bubbleMe: { 
     paddingVertical: 10, paddingHorizontal: 14, 

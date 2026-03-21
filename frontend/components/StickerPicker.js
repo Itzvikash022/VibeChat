@@ -10,6 +10,7 @@ import {
   Platform,
   Image,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import { Audio } from 'expo-av';
@@ -30,14 +31,23 @@ const StickerPicker = ({ userId, onSend, onClose, theme, navigation }) => {
   const [recording, setRecording] = useState(null);
   const [isRecording, setIsRecording] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
 
   // ─── Fetch Library ───────────────────────────────────────────────────────────
   const fetchStickers = useCallback(async () => {
     if (activeTab !== 'library' || !userId) return;
-    setLoading(true);
+    
     try {
+      const cached = await AsyncStorage.getItem(`stickers_${userId}`);
+      if (cached) {
+        setStickers(JSON.parse(cached));
+      } else {
+        setLoading(true);
+      }
+      
       const { data } = await api.get(`/stickers/me?userId=${userId}`);
       setStickers(data);
+      AsyncStorage.setItem(`stickers_${userId}`, JSON.stringify(data));
     } catch (err) {
       console.error('Failed to load stickers:', err);
     } finally {
@@ -166,7 +176,7 @@ const StickerPicker = ({ userId, onSend, onClose, theme, navigation }) => {
     const { data } = await api.post('/media/upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
-    return data.url;
+    return data?.data?.url || data?.url;
   };
 
   // ─── Create Action ───────────────────────────────────────────────────────────
@@ -207,11 +217,13 @@ const StickerPicker = ({ userId, onSend, onClose, theme, navigation }) => {
       const { data } = await api.post('/stickers', payload);
       console.log('Sticker Saved:', data);
 
-      Alert.alert('Success', 'Sticker added to library!');
-      // Reset & Switch
-      setSelectedImage(null);
-      setSelectedAudio(null);
-      setActiveTab('library');
+      setShowSuccess(true);
+      setTimeout(() => {
+        setShowSuccess(false);
+        setSelectedImage(null);
+        setSelectedAudio(null);
+        setActiveTab('library');
+      }, 1500);
     } catch (err) {
       console.error('Create sticker error:', err.response?.data || err.message);
       const serverMsg = err.response?.data?.error || 'Failed to save sticker.';

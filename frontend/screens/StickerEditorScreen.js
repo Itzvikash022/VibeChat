@@ -43,7 +43,7 @@ const uploadToCloudinary = async (file) => {
   const { data } = await api.post('/media/upload', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   });
-  return data.url;
+  return data?.data?.url || data?.url;
 };
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -333,12 +333,11 @@ export default function StickerEditorScreen({ navigation, route }) {
       };
 
       await api.post('/stickers', payload);
-      // Navigate back immediately — don't wait for user to tap OK
-      navigation.goBack();
-      // Show non-blocking success on mobile; on web use console (no Alert needed)
-      if (Platform.OS !== 'web') {
-        Alert.alert('✅ Saved!', 'Sticker added to your library.');
-      }
+      setShowSuccess(true);
+      setTimeout(() => {
+        setShowSuccess(false);
+        navigation.goBack();
+      }, 1500);
 
     } catch (err) {
       Alert.alert('Error', err?.response?.data?.error || 'Failed to save sticker.');

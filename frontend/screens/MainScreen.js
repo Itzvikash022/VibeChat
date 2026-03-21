@@ -99,15 +99,23 @@ async function registerForPushNotificationsAsync() {
 const uploadToCloudinary = async (localUri, resourceType = 'image') => {
   const formData = new FormData();
   const ext = localUri.split('.').pop();
-  formData.append('file', {
-    uri: localUri,
-    type: resourceType === 'video' ? `video/${ext}` : (resourceType === 'raw' ? 'audio/m4a' : `image/${ext}`),
-    name: `upload.${ext}`,
+  if (Platform.OS === 'web') {
+    const resp = await fetch(localUri);
+    const blob = await resp.blob();
+    formData.append('file', blob, `upload.${ext}`);
+  } else {
+    let type = resourceType === 'video' ? `video/${ext}` : (resourceType === 'raw' ? 'audio/m4a' : `image/${ext}`);
+    formData.append('file', {
+      uri: Platform.OS === 'android' ? localUri : localUri.replace('file://', ''),
+      name: `upload.${ext}`,
+      type,
+    });
+  }
+
+  const { data } = await api.post('/media/upload', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
   });
-  formData.append('upload_preset', 'vibechat_unsigned');
-  const res = await fetch(`https://api.cloudinary.com/v1_1/drfptsgim/${resourceType}/upload`, { method: 'POST', body: formData });
-  const data = await res.json();
-  return data.secure_url;
+  return data?.data?.url || data?.url;
 };
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -759,6 +767,8 @@ export default function MainScreen({ navigation }) {
                 {/* Messages List */}
                 <FlatList
                   ref={flatListRef}
+                  onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+                  onLayout={() => flatListRef.current?.scrollToEnd({ animated: true })}
                   data={messages}
                   keyExtractor={(item) => item._id?.toString()}
                   renderItem={renderMsg}
@@ -954,7 +964,8 @@ export default function MainScreen({ navigation }) {
     );
   }
 
-  function renderMsg({ item: msg }) {
+  function renderMsg({ item: msg, index }) {
+    const isLastMessage = index === messages.length - 1;
     return (
       <View style={{ flexDirection: msg.senderId?.toString() === userId ? 'row-reverse' : 'row', alignItems: 'flex-end', marginBottom: 8 }}>
         {msg.deletedFor?.includes(userId) ? (
@@ -963,6 +974,7 @@ export default function MainScreen({ navigation }) {
           <MessageBubble 
             item={msg} 
             userId={userId}
+            isLastMessage={isLastMessage}
             theme={theme}
             currentPlayingUrl={currentPlayingUrl}
             setCurrentPlayingUrl={setCurrentPlayingUrl}
