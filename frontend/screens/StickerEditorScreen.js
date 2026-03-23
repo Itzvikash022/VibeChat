@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
-import { Audio } from 'expo-av';
+import { useAudioRecorder, requestRecordingPermissionsAsync, setAudioModeAsync, RecordingPresets } from 'expo-audio';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../context/ThemeContext';
@@ -177,10 +177,9 @@ const ColorRow = ({ selectedColor, onSelect }) => (
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // ─── AudioAttachButton ────────────────────────────────────────────────────────
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-let _recording = null;
-
 const AudioAttachButton = ({ selectedAudio, onAudioChange, theme }) => {
   const [isRecording, setIsRecording] = useState(false);
+  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
 
   const pickAudioFile = async () => {
     try {
@@ -195,20 +194,20 @@ const AudioAttachButton = ({ selectedAudio, onAudioChange, theme }) => {
 
   const startRecording = async () => {
     try {
-      await Audio.requestPermissionsAsync();
-      await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
-      const { recording } = await Audio.Recording.createAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
-      _recording = recording;
+      const perm = await requestRecordingPermissionsAsync();
+      if (!perm.granted) return;
+      await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true, interruptionMode: 'mixWithOthers' });
+      await recorder.prepareToRecordAsync();
+      recorder.record();
       setIsRecording(true);
     } catch { Alert.alert('Error', 'Could not start recording.'); }
   };
 
   const stopRecording = async () => {
-    if (!_recording) return;
+    if (!recorder) return;
     setIsRecording(false);
-    await _recording.stopAndUnloadAsync();
-    const uri = _recording.getURI();
-    _recording = null;
+    await recorder.stop();
+    const uri = recorder.uri;
     onAudioChange({ uri, name: `recording_${Date.now()}.m4a`, type: 'audio/m4a', size: 0 });
   };
 
