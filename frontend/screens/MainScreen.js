@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
-import { Audio } from 'expo-av';
+import { useAudioRecorder, requestRecordingPermissionsAsync, setAudioModeAsync, RecordingPresets } from 'expo-audio';
 import { useTheme } from '../context/ThemeContext';
 import { getSocket, disconnectSocket } from '../services/socketService';
 import api from '../services/api';
@@ -41,7 +41,6 @@ const stopGlobalSound = async () => {
 };
 
 // ─── Recording helpers ─────────────────────────────────────────────────────────
-let _recording = null;
 
 // ─── Push Notifications helpers ────────────────────────────────────────────────
 async function registerForPushNotificationsAsync() {
@@ -159,6 +158,7 @@ export default function MainScreen({ navigation }) {
   const socketRef = useRef(null);
   const flatListRef = useRef(null);
   const activeChatRef = useRef(null);
+  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
 
   useEffect(() => { activeChatRef.current = activeChat; }, [activeChat]);
 
@@ -384,11 +384,11 @@ export default function MainScreen({ navigation }) {
 
   const startRecording = async () => {
     try {
-      const perm = await Audio.requestPermissionsAsync();
+      const perm = await requestRecordingPermissionsAsync();
       if (!perm.granted) return;
-      await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
-      const { recording } = await Audio.Recording.createAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
-      _recording = recording;
+      await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true, interruptionMode: 'mixWithOthers' });
+      await recorder.prepareToRecordAsync();
+      recorder.record();
       setIsRecording(true);
       setShowAttachMenu(false);
     } catch (e) { console.error('Failed to start recording', e); }
@@ -396,9 +396,8 @@ export default function MainScreen({ navigation }) {
 
   const stopRecording = async () => {
     try {
-      await _recording.stopAndUnloadAsync();
-      const uri = _recording.getURI();
-      _recording = null;
+      await recorder.stop();
+      const uri = recorder.uri;
       setIsRecording(false);
       setPendingAudio(uri);
     } catch (e) { console.error('Failed to stop recording', e); }

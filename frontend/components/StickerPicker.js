@@ -13,7 +13,7 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
-import { Audio } from 'expo-av';
+import { useAudioRecorder, requestRecordingPermissionsAsync, setAudioModeAsync, RecordingPresets } from 'expo-audio';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import api from '../services/api';
 import StickerGridItem from './StickerGridItem';
@@ -32,6 +32,7 @@ const StickerPicker = ({ userId, onSend, onClose, theme, navigation }) => {
   const [isRecording, setIsRecording] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
 
   // ─── Fetch Library ───────────────────────────────────────────────────────────
   const fetchStickers = useCallback(async () => {
@@ -134,10 +135,12 @@ const StickerPicker = ({ userId, onSend, onClose, theme, navigation }) => {
   // ─── Audio Recording ─────────────────────────────────────────────────────────
   const startRecording = async () => {
     try {
-      await Audio.requestPermissionsAsync();
-      await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
-      const { recording } = await Audio.Recording.createAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
-      setRecording(recording);
+      const perm = await requestRecordingPermissionsAsync();
+      if (!perm.granted) return;
+      await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true, interruptionMode: 'mixWithOthers' });
+      await recorder.prepareToRecordAsync();
+      recorder.record();
+      setRecording(recorder);
       setIsRecording(true);
     } catch (err) {
       Alert.alert('Error', 'Could not start recording.');
@@ -147,8 +150,8 @@ const StickerPicker = ({ userId, onSend, onClose, theme, navigation }) => {
   const stopRecording = async () => {
     if (!recording) return;
     setIsRecording(false);
-    await recording.stopAndUnloadAsync();
-    const uri = recording.getURI();
+    await recording.stop();
+    const uri = recording.uri;
     setSelectedAudio({
       uri,
       name: `recording_${Date.now()}.m4a`,

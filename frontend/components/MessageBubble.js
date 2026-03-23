@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { Audio } from 'expo-av';
+import { createAudioPlayer } from 'expo-audio';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import ImageMessage from './ImageMessage';
@@ -12,25 +12,44 @@ import api from '../services/api';
  */
 const StickerContent = ({ id, url, audioUrl, isMe, theme, currentPlayingUrl, setCurrentPlayingUrl, isLastMessage }) => {
   const [status, setStatus] = useState('idle');
-  const soundRef = useRef(null);
+  const playerRef = useRef(null);
   const isAutoplayed = useRef(false);
+
+  useEffect(() => {
+    if (!audioUrl) return undefined;
+
+    const player = createAudioPlayer(audioUrl);
+    playerRef.current = player;
+
+    const syncStatus = (s) => {
+      if (s.didJustFinish) {
+        setStatus('finished');
+        setCurrentPlayingUrl((current) => (current === audioUrl ? null : current));
+      } else if (s.playing) {
+        setStatus('playing');
+      }
+    };
+
+    syncStatus(player.currentStatus);
+    player.addListener('playbackStatusUpdate', syncStatus);
+
+    return () => {
+      player.remove();
+      playerRef.current = null;
+    };
+  }, [audioUrl, setCurrentPlayingUrl]);
 
   const play = async () => {
     if (!audioUrl) return;
-    if (soundRef.current) { await soundRef.current.unloadAsync(); soundRef.current = null; }
     try {
       setCurrentPlayingUrl(audioUrl);
       setStatus('playing');
-      const { sound } = await Audio.Sound.createAsync(
-        { uri: audioUrl }, { shouldPlay: true },
-        (s) => { if (s.didJustFinish) { setStatus('finished'); if (currentPlayingUrl === audioUrl) setCurrentPlayingUrl(null); } }
-      );
-      soundRef.current = sound;
+      playerRef.current?.play();
     } catch (err) { console.error('Sticker audio error:', err); setStatus('finished'); }
   };
 
   const stop = async () => {
-    if (soundRef.current) { await soundRef.current.stopAsync(); await soundRef.current.unloadAsync(); soundRef.current = null; }
+    if (playerRef.current) { playerRef.current.pause(); }
     setStatus('finished');
   };
 
@@ -59,13 +78,12 @@ const StickerContent = ({ id, url, audioUrl, isMe, theme, currentPlayingUrl, set
 
     return () => {
       isCancelled = true;
-      if (soundRef.current) soundRef.current.unloadAsync();
     };
   }, [audioUrl, isMe, id, isLastMessage]);
 
   useEffect(() => {
     if (currentPlayingUrl && currentPlayingUrl !== audioUrl && status === 'playing') stop();
-  }, [currentPlayingUrl]);
+  }, [currentPlayingUrl, audioUrl, status]);
 
   return (
     <TouchableOpacity activeOpacity={0.9} onPress={play} style={styles.stickerContainer}>

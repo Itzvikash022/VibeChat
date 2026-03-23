@@ -1,80 +1,83 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Platform, Alert } from 'react-native';
-import { Audio } from 'expo-av';
+import { createAudioPlayer, setAudioModeAsync } from 'expo-audio';
 import { Ionicons } from '@expo/vector-icons';
 
 /**
  * AudioPlayer Component
- * Handles playback of voice messages. 
+ * Handles playback of voice messages.
  * Ensures only one audio plays at a time via external control.
  */
 const AudioPlayer = ({ url, isMe, theme, currentPlayingUrl, setCurrentPlayingUrl, hideCopy }) => {
-  const [sound, setSound] = useState(null);
+  const playerRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    return sound ? () => { sound.unloadAsync(); } : undefined;
-  }, [sound]);
+    if (!url) return undefined;
 
-  // Monitor global currentPlayingUrl to stop if another one starts
+    const player = createAudioPlayer(url);
+    playerRef.current = player;
+
+    const syncStatus = (status) => {
+      setIsPlaying(Boolean(status.playing));
+      if (status.playing || status.didJustFinish || status.error) {
+        setLoading(false);
+      }
+      if (status.didJustFinish) {
+        setCurrentPlayingUrl(null);
+      }
+    };
+
+    syncStatus(player.currentStatus);
+    player.addListener('playbackStatusUpdate', syncStatus);
+
+    return () => {
+      player.remove();
+      playerRef.current = null;
+    };
+  }, [url, setCurrentPlayingUrl]);
+
+  // Stop if another audio starts playing elsewhere in the thread
   useEffect(() => {
     if (currentPlayingUrl !== url && isPlaying) {
       stopPlayback();
     }
-  }, [currentPlayingUrl]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPlayingUrl, url, isPlaying]);
 
   async function playSound() {
     try {
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: false,
-        playsInSilentModeIOS: true,
-        staysActiveInBackground: true,
-        shouldDuckAndroid: true,
+      await setAudioModeAsync({
+        allowsRecording: false,
+        playsInSilentMode: true,
+        interruptionMode: 'duckOthers',
+        shouldPlayInBackground: true,
       });
 
-      if (sound) {
-        await sound.playAsync();
-        setIsPlaying(true);
-        setCurrentPlayingUrl(url);
-        return;
+      if (!playerRef.current) {
+        throw new Error('Audio player is not ready');
       }
 
       setLoading(true);
-      console.log('Attempting to play audio:', url);
-      const { sound: newSound } = await Audio.Sound.createAsync(
-        { uri: url },
-        { shouldPlay: true }
-      ).catch(err => {
-        console.error('Audio.Sound.createAsync error:', err);
-        throw err;
-      });
-      
-      setSound(newSound);
+      playerRef.current.play();
       setIsPlaying(true);
       setCurrentPlayingUrl(url);
-      setLoading(false);
-
-      newSound.setOnPlaybackStatusUpdate((status) => {
-        if (status.error) {
-          console.error('Playback status error:', status.error);
-        }
-        if (status.didJustFinish) {
-          setIsPlaying(false);
-          setCurrentPlayingUrl(null);
-        }
-      });
     } catch (error) {
       console.error('Audio playback error details:', error);
-      Alert.alert('Playback Error', 'Could not play this audio file. Check your browser permissions.');
+      Alert.alert('Playback Error', 'Could not play this audio file. Check your connection or permissions.');
       setLoading(false);
     }
   }
 
   async function stopPlayback() {
-    if (sound) {
-      await sound.pauseAsync();
-      setIsPlaying(false);
+    if (playerRef.current) {
+      playerRef.current.pause();
+    }
+    setIsPlaying(false);
+    setLoading(false);
+    if (currentPlayingUrl === url) {
+      setCurrentPlayingUrl(null);
     }
   }
 
@@ -91,8 +94,8 @@ const AudioPlayer = ({ url, isMe, theme, currentPlayingUrl, setCurrentPlayingUrl
   };
 
   return (
-    <TouchableOpacity 
-      style={[styles.container, { backgroundColor: isMe ? 'rgba(255,255,255,0.1)' : theme.input }]} 
+    <TouchableOpacity
+      style={[styles.container, { backgroundColor: isMe ? 'rgba(255,255,255,0.1)' : theme.input }]}
       onPress={handlePress}
     >
       <View style={styles.row}>
