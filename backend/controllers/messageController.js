@@ -10,7 +10,7 @@ const User    = require('../models/User');
  *          The other user still sees the messages.
  * 'both' → hard-delete: remove the documents entirely for both users.
  */
-const deleteHistory = async (req, res) => {
+const deleteHistory = async (req, res, next) => {
   const { userId, otherUserId, deleteType } = req.body;
 
   if (!userId || !otherUserId || !deleteType) {
@@ -48,7 +48,7 @@ const deleteHistory = async (req, res) => {
  * each with their username and the last non-deleted message.
  * This is called on login so offline messages show up in the sidebar.
  */
-const getConversations = async (req, res) => {
+const getConversations = async (req, res, next) => {
   const { userId } = req.query;
   if (!userId) return res.status(400).json({ error: 'userId is required.' });
 
@@ -104,7 +104,7 @@ const getConversations = async (req, res) => {
  * Body: { userId, vibeIdOrUsername }
  * Used to "add" a conversation by verifying the partner exists.
  */
-const addConversation = async (req, res) => {
+const addConversation = async (req, res, next) => {
   const { userId, vibeIdOrUsername } = req.body;
   if (!vibeIdOrUsername) return res.status(400).json({ error: 'Vibe ID or Username required' });
 

@@ -29,21 +29,24 @@ const PRESET_COLORS = ['#ffffff', '#000000', '#f87171', '#facc15', '#4ade80', '#
 // ─── Upload Helper ─────────────────────────────────────────────────────────────
 const uploadToCloudinary = async (file) => {
   const formData = new FormData();
+  const ext = file.uri.split('.').pop();
   if (Platform.OS === 'web') {
     const resp = await fetch(file.uri);
     const blob = await resp.blob();
     formData.append('file', blob, file.name || 'upload');
   } else {
+    // Force 'video/mp4' for audio to ensure Cloudinary treats it as a playable video container (standard for HLS)
+    let type = file.type?.startsWith('audio') ? 'video/mp4' : file.type;
     formData.append('file', {
       uri: Platform.OS === 'android' ? file.uri : file.uri.replace('file://', ''),
       name: file.name,
-      type: file.type,
+      type,
     });
   }
   const { data } = await api.post('/media/upload', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   });
-  return data.url;
+  return data?.data?.url || data?.url;
 };
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -263,6 +266,8 @@ export default function StickerEditorScreen({ navigation, route }) {
   const [isPreview, setIsPreview] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [isPublic, setIsPublic] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
+
 
   // Keep position updates snappy without re-rendering the whole screen
   const overlaysRef = useRef(overlays);
@@ -333,12 +338,11 @@ export default function StickerEditorScreen({ navigation, route }) {
       };
 
       await api.post('/stickers', payload);
-      // Navigate back immediately — don't wait for user to tap OK
-      navigation.goBack();
-      // Show non-blocking success on mobile; on web use console (no Alert needed)
-      if (Platform.OS !== 'web') {
-        Alert.alert('✅ Saved!', 'Sticker added to your library.');
-      }
+      setShowSuccess(true);
+      setTimeout(() => {
+        setShowSuccess(false);
+        navigation.goBack();
+      }, 1500);
 
     } catch (err) {
       Alert.alert('Error', err?.response?.data?.error || 'Failed to save sticker.');
@@ -497,6 +501,15 @@ export default function StickerEditorScreen({ navigation, route }) {
           </LinearGradient>
         </TouchableOpacity>
       </View>
+
+      {showSuccess && (
+        <View style={s.successOverlay}>
+          <View style={[s.successCard, { backgroundColor: theme['surface-container-high'] || theme.card }]}>
+            <Ionicons name="checkmark-circle" size={60} color={theme.primary || '#c0c1ff'} />
+            <Text style={[s.successText, { color: theme['on-surface'] || theme.text }]}>Sticker Saved!</Text>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -572,4 +585,35 @@ const s = StyleSheet.create({
   saveBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 14, borderRadius: 12 },
   saveBtnDisabled: { opacity: 0.5 },
   saveBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  successOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 9999,
+  },
+  successCard: {
+    padding: 30, borderRadius: 24, alignItems: 'center', gap: 12,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 15,
+  },
+  successText: { color: '#fff', fontSize: 18, fontWeight: '800' },
+  container: {
+    position: 'absolute',
+    bottom: 80,
+    left: 20,
+    zIndex: 1000,
+    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+    ...Platform.select({
+      web: {
+        '& .emoji-scroll-wrapper': {
+          scrollbarWidth: 'none',
+          msOverflowStyle: 'none',
+        },
+        '& .emoji-scroll-wrapper::-webkit-scrollbar': {
+          display: 'none',
+        },
+      },
+      default: {},
+    }),
+  },
 });

@@ -9,6 +9,10 @@ let socket = null;
  * @returns {Socket} the socket instance
  */
 export const getSocket = (token) => {
+  if (!token) {
+    throw new Error('Socket auth token is required');
+  }
+
   if (!socket) {
     socket = io(BASE_URL, {
       transports: ['websocket'],
@@ -30,6 +34,8 @@ export const getSocket = (token) => {
       console.error('Socket connection error:', err.message);
       // If auth failed, we might want to trigger a refresh or logout
     });
+  } else if (token && socket.auth?.token !== token) {
+    socket.auth = { token };
   }
   return socket;
 };

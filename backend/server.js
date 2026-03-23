@@ -27,6 +27,11 @@ connectDB();
 const app = express();
 const server = http.createServer(app);
 
+app.use((req, res, next) => {
+  logger.info(`${req.method} ${req.originalUrl}`);
+  next();
+});
+
 // Security Handening
 app.use(helmet()); // Secure HTTP headers
 app.use(compression()); // Compress responses
@@ -82,12 +87,6 @@ const io = new Server(server, {
 
 io.use(socketAuth); // Protect socket connections
 initSocket(io);
-
-// Request logging middleware
-app.use((req, res, next) => {
-  logger.info(`${req.method} ${req.originalUrl}`);
-  next();
-});
 
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, '0.0.0.0', () => {
