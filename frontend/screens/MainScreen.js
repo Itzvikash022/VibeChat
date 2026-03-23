@@ -104,7 +104,8 @@ const uploadToCloudinary = async (localUri, resourceType = 'image') => {
     const blob = await resp.blob();
     formData.append('file', blob, `upload.${ext}`);
   } else {
-    let type = resourceType === 'video' ? `video/${ext}` : (resourceType === 'raw' ? 'audio/m4a' : `image/${ext}`);
+    // Force 'video/mp4' for audio/m4a to ensure Cloudinary treats it as a playable video container (standard for HLS)
+    let type = resourceType === 'video' ? `video/${ext}` : (resourceType === 'raw' ? 'video/mp4' : `image/${ext}`);
     formData.append('file', {
       uri: Platform.OS === 'android' ? localUri : localUri.replace('file://', ''),
       name: `upload.${ext}`,
@@ -413,7 +414,7 @@ export default function MainScreen({ navigation }) {
     let messageType = 'text'; let message = text; let mediaUrl = null; let audioUrl = null;
     const optimisticId = Date.now().toString();
     try {
-      if (img) { setUploading(true); mediaUrl = await uploadToCloudinary(img, 'image'); messageType = 'image'; setUploading(false); }
+      if (img) { setUploading(true); mediaUrl = await uploadToCloudary(img, 'image'); messageType = 'image'; setUploading(false); }
       else if (aud) { setUploading(true); audioUrl = await uploadToCloudinary(aud, 'raw'); messageType = 'audio'; setUploading(false); }
       // Payload must match backend schema: senderId, receiverId, messageType, message, mediaUrl, audioUrl
       // Optimistic render with 'sending' status
@@ -508,11 +509,11 @@ export default function MainScreen({ navigation }) {
             {/* ── Dot-grid decorative overlay (right edge) ── */}
             <View pointerEvents="none" style={StyleSheet.absoluteFill}>
               {/* Glowing side accent line */}
-              <View style={[s.sidebarGlowBorder, { backgroundColor: (theme.primary || '#c0c1ff') + '55' }]} />
+              <View style={[s.sidebarGlowBorder, { backgroundColor: (theme.primary || '#c0c1ff') + (isDark ? '55' : '22') }]} />
               {/* Dot pattern — web only via inline style */}
               {Platform.OS === 'web' && (
                 <View
-                  style={[StyleSheet.absoluteFill, { opacity: 0.25 }]}
+                  style={[StyleSheet.absoluteFill, { opacity: isDark ? 0.25 : 0.4 }]}
                   // @ts-ignore
                   // eslint-disable-next-line react-native/no-inline-styles
                   accessibilityLabel="dot-grid"
@@ -521,8 +522,10 @@ export default function MainScreen({ navigation }) {
                   <View style={{
                     position: 'absolute', right: 0, top: 0, bottom: 0, width: 32,
                     // @ts-ignore
-                    backgroundImage: 'radial-gradient(circle, rgba(192,193,255,0.7) 1px, transparent 1px)',
-                    backgroundSize: '8px 8px',
+                    backgroundImage: isDark 
+                      ? 'radial-gradient(circle, rgba(192,193,255,0.7) 1px, transparent 1px)'
+                      : `repeating-linear-gradient(45deg, ${theme.sidebarBorder} 0, ${theme.sidebarBorder} 1px, transparent 0, transparent 50%)`,
+                    backgroundSize: isDark ? '8px 8px' : '4px 4px',
                   }} />
                 </View>
               )}
@@ -574,7 +577,8 @@ export default function MainScreen({ navigation }) {
               data={filteredConversations}
               keyExtractor={(item) => item.userId}
               renderItem={renderConv}
-              contentContainerStyle={{ paddingBottom: 120 }}
+              contentContainerStyle={[{ paddingBottom: 120 }, s.hideScroll]}
+              showsVerticalScrollIndicator={false}
               ListEmptyComponent={
                 <Text style={[s.emptyText, { color: theme.outline || theme.textSecondary }]}>
                   No connections yet.{'\n'}Add a chat from Settings.
@@ -665,9 +669,18 @@ export default function MainScreen({ navigation }) {
               <TouchableOpacity style={[s.closeSettingsBtn, { borderColor: theme['outline-variant'] || '#333' }]} onPress={() => setShowSettings(false)}>
                 <Text style={{ color: theme['on-surface-variant'] || theme.textSecondary, fontSize: 14, fontWeight: '600' }}>Close</Text>
               </TouchableOpacity>
-              </TouchableOpacity>
             </TouchableOpacity>
-          </Modal>
+          </TouchableOpacity>
+        </Modal>
+
+        {/* ══ STICKER PICKER MODAL ═══════════════════════════════════════════ */}
+        <Modal visible={showStickers} transparent animationType="slide" onRequestClose={() => setShowStickers(false)}>
+          <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={() => setShowStickers(false)}>
+            <TouchableOpacity activeOpacity={1} onPress={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 600, height: 450 }}>
+              <StickerPicker userId={userId} onSend={handleSendSticker} onClose={() => setShowStickers(false)} theme={theme} navigation={navigation} />
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </Modal>
 
         {/* ══ DELETE CHAT MODAL ══════════════════════════════════════════════ */}
         <Modal transparent visible={showDeleteModal} animationType="fade" onRequestClose={() => setShowDeleteModal(false)}>
@@ -772,7 +785,8 @@ export default function MainScreen({ navigation }) {
                   data={messages}
                   keyExtractor={(item) => item._id?.toString()}
                   renderItem={renderMsg}
-                  contentContainerStyle={s.msgList}
+                  contentContainerStyle={[s.msgList, s.hideScroll]}
+                  showsVerticalScrollIndicator={false}
                   ListHeaderComponent={
                     <View style={s.dateDivider}>
                        <Text style={[s.dateDividerText, { backgroundColor: theme['surface-container'] || '#1c2333', color: theme['on-surface-variant'] || theme.text }]}>TODAY</Text>
@@ -786,7 +800,6 @@ export default function MainScreen({ navigation }) {
                 />
 
                 <EmojiPicker isVisible={showEmoji} onEmojiSelect={(emoji) => setInputText((prev) => prev + emoji)} theme={{ isDark }} />
-                {showStickers && <StickerPicker userId={userId} onSend={handleSendSticker} onClose={() => setShowStickers(false)} theme={theme} navigation={navigation} />}
 
                 {/* Input Bar */}
                 <View style={s.inputBarWrapper}>
@@ -848,7 +861,7 @@ export default function MainScreen({ navigation }) {
                     )}
 
                     <TextInput
-                      style={[s.textInput, { color: theme['on-surface'] || theme.text }, !isDesktop && { minHeight: 48 }]}
+                      style={[s.textInput, { color: theme['on-surface'] || theme.text }, !isDesktop && { minHeight: 48 }, s.hideScroll]}
                       placeholder={isRecording ? 'Recording...' : uploading ? 'Uploading...' : 'Vibe here...'}
                       placeholderTextColor={theme.outline || theme.textSecondary}
                       value={inputText}
@@ -857,6 +870,7 @@ export default function MainScreen({ navigation }) {
                       maxLength={1000}
                       onKeyPress={handleKeyPress}
                       editable={!uploading && !isRecording}
+                      showsVerticalScrollIndicator={false}
                     />
 
                     <TouchableOpacity disabled={(!inputText.trim() && !pendingImage && !pendingAudio) || uploading || isRecording} onPress={sendMessage}>
@@ -873,13 +887,22 @@ export default function MainScreen({ navigation }) {
               </KeyboardAvoidingView>
             ) : (
               /* Welcome Screen */
-               <View style={s.welcomeState}>
-                  <View style={[s.welcomeBgTop, { backgroundColor: (theme.primary || '#c0c1ff') + '0D' }]} />
-                  <View style={[s.welcomeBgBottom, { backgroundColor: (theme.tertiary || '#65d9a5') + '0D' }]} />
+               <View style={[s.welcomeState, !isDark && { backgroundColor: theme.surface }]}>
+                  {/* Subtle web texture grid in light mode */}
+                  {!isDark && Platform.OS === 'web' && (
+                    <View style={[StyleSheet.absoluteFill, { 
+                      opacity: 0.3,
+                      // @ts-ignore
+                      backgroundImage: `repeating-linear-gradient(45deg, ${theme.sidebarBorder} 0, ${theme.sidebarBorder} 1px, transparent 0, transparent 40px)`,
+                      backgroundSize: '20px 20px',
+                    }]} pointerEvents="none" />
+                  )}
+                  <View style={[s.welcomeBgTop, { backgroundColor: (theme.primary || '#c0c1ff') + (isDark ? '0D' : '15') }]} />
+                  <View style={[s.welcomeBgBottom, { backgroundColor: (theme.tertiary || '#65d9a5') + (isDark ? '0D' : '10') }]} />
                   
                   <View style={s.heroGraphicContainer}>
-                     <View style={[s.heroGlow, { backgroundColor: (theme.primary || '#c0c1ff') + '33' }]} />
-                     <View style={[s.heroBox, { borderColor: (theme['outline-variant'] || '#333') + '1A', backgroundColor: (theme.surface || '#0b1326') + 'B3' }]}>
+                     <View style={[s.heroGlow, { backgroundColor: (theme.primary || '#c0c1ff') + (isDark ? '33' : '22') }]} />
+                     <View style={[s.heroBox, { borderColor: (theme['outline-variant'] || '#333') + (isDark ? '1A' : '40'), backgroundColor: (theme.surface || '#0b1326') + (isDark ? 'B3' : 'E6') }]}>
                         <MaterialCommunityIcons name="auto-fix" size={64} color={theme.primary || '#c0c1ff'} />
                      </View>
                   </View>
@@ -1167,7 +1190,9 @@ const s = StyleSheet.create({
     // @ts-ignore — web-only CSS-in-JS property
     backdropFilter: 'blur(24px) saturate(160%)',
     WebkitBackdropFilter: 'blur(24px) saturate(160%)',
-    backgroundColor: 'rgba(11,19,38,0.65)',
+    // In light mode, glass effect is driven inherently by theme, so we adjust raw opacity here
+    // or let ThemeContext handle standard colors.
+    backgroundColor: 'rgba(255, 255, 255, 0.75)', 
   },
 
   // ─── Glass content panel ─────────────────────────────────────────────────
@@ -1179,7 +1204,16 @@ const s = StyleSheet.create({
   contentPanelGlassWeb: {
     backdropFilter: 'blur(32px) saturate(140%)',
     WebkitBackdropFilter: 'blur(32px) saturate(140%)',
-    backgroundColor: 'rgba(8,14,30,0.42)',
+    backgroundColor: 'rgba(255, 255, 255, 0.65)',
   },
+  // ─── Scrollbar Hiding (Web) ─────────────────────────────────────────────
+  hideScroll: Platform.select({
+    web: {
+      overflow: 'auto',
+      scrollbarWidth: 'none',
+      msOverflowStyle: 'none',
+      '&::-webkit-scrollbar': { display: 'none' },
+    },
+    default: {},
+  }),
 });
-
