@@ -503,7 +503,10 @@ export default function MainScreen({ navigation }) {
             s.sidebar,
             s.sidebarGlass,
             Platform.OS === 'web' && s.sidebarGlassWeb,
-            { borderRightColor: (theme['outline-variant'] || '#5b5ea6') + '30' },
+            { 
+              borderRightColor: (theme['outline-variant'] || '#5b5ea6') + '30',
+              backgroundColor: isDark ? 'rgba(11, 19, 38, 0.72)' : 'rgba(255, 255, 255, 0.75)'
+            },
             !isDesktop && { width: '100%', flex: 1, borderRightWidth: 0 },
           ]}>
             {/* ── Dot-grid decorative overlay (right edge) ── */}
@@ -747,7 +750,7 @@ export default function MainScreen({ navigation }) {
             s.contentPanel,
             s.contentPanelGlass,
             Platform.OS === 'web' && s.contentPanelGlassWeb,
-            { backgroundColor: 'transparent' },
+            { backgroundColor: isDark ? 'rgba(8, 14, 30, 0.55)' : 'rgba(255, 255, 255, 0.65)' },
           ]}>
             {activeChat ? (
               <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={isDesktop ? 0 : 64}>
@@ -1184,7 +1187,6 @@ const s = StyleSheet.create({
   sidebarGlass: {
     borderRightWidth: 1,
     // Semi-transparent base for native; web overrides with backdrop-filter
-    backgroundColor: 'rgba(11,19,38,0.72)',
   },
   sidebarGlassWeb: {
     // @ts-ignore — web-only CSS-in-JS property
@@ -1192,19 +1194,16 @@ const s = StyleSheet.create({
     WebkitBackdropFilter: 'blur(24px) saturate(160%)',
     // In light mode, glass effect is driven inherently by theme, so we adjust raw opacity here
     // or let ThemeContext handle standard colors.
-    backgroundColor: 'rgba(255, 255, 255, 0.75)', 
   },
 
   // ─── Glass content panel ─────────────────────────────────────────────────
   contentPanelGlass: {
     flex: 1,
     position: 'relative',
-    backgroundColor: 'rgba(8,14,30,0.55)',
   },
   contentPanelGlassWeb: {
     backdropFilter: 'blur(32px) saturate(140%)',
     WebkitBackdropFilter: 'blur(32px) saturate(140%)',
-    backgroundColor: 'rgba(255, 255, 255, 0.65)',
   },
   // ─── Scrollbar Hiding (Web) ─────────────────────────────────────────────
   hideScroll: Platform.select({
